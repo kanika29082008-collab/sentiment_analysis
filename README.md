@@ -4,26 +4,13 @@ A machine learning project that classifies social media text (tweets/reviews) in
 
 ---
 
-## 🚀 Features
-- Clean text preprocessing (URLs, punctuation, case normalization)
-- TF‑IDF vectorization
-- Logistic regression (SGDClassifier) model
-- Training progress plots (accuracy & loss curves)
-- Saved model + vectorizer for reuse
-- Interactive **Streamlit app** for live predictions
+## 🔄 Project Workflow
 
----
-
-## 📂 Dataset
-This project uses the [Sentiment140 dataset](https://www.kaggle.com/datasets/kazanova/sentiment140).  
-⚠️ Note: The dataset is **not included in this repo** due to size limits. Please download it separately and place `sentiment140.csv` in your project folder.
-
----
-
-## 🛠️ Installation
-Clone the repo and install dependencies:
-
-```bash
-git clone https://github.com/yourusername/sentiment_analysis.git
-cd sentiment_analysis
-pip install -r requirements.txt
+```mermaid
+flowchart TD
+    A[📥 Data Collection\nSentiment140 Dataset] --> B[🧹 Preprocessing\nClean text, remove URLs & punctuation]
+    B --> C[🔠 Feature Extraction\nTF-IDF Vectorization]
+    C --> D[🤖 Model Training\nSGDClassifier (Logistic Regression)]
+    D --> E[📈 Evaluation\nAccuracy & Loss Curves]
+    E --> F[💾 Save Artifacts\nModel + Vectorizer]
+    F --> G[🌐 Streamlit App\nInteractive Sentiment Prediction]
