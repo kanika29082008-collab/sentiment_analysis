@@ -1,123 +1,90 @@
-# sentiment_analysis.py
-
-import os
 import pandas as pd
 import re
 import string
+import joblib
+import matplotlib
+matplotlib.use("Agg")   # non-GUI backend (no blocking window)
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import SGDClassifier
-from sklearn.metrics import accuracy_score, log_loss, classification_report
+from sklearn.metrics import accuracy_score, log_loss
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
-# Step 1: Load dataset safely with balanced sampling
-def load_data(path, sample_size=50000):
-    folder = os.path.dirname(path)
-    print("📂 Debug: Files in", folder)
-    for f in os.listdir(folder):
-        print(" -", f)
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Dataset not found at: {path}")
-
-    df = pd.read_csv(path, encoding="latin-1", header=None)
-    df = df[[5, 0]]
-    df.columns = ["text", "label"]
-    df["label"] = df["label"].apply(lambda x: 1 if x == 4 else 0)
-
-    # Balanced sampling: half negative, half positive
-    neg = df[df["label"] == 0].sample(sample_size // 2, random_state=42)
-    pos = df[df["label"] == 1].sample(sample_size // 2, random_state=42)
-    df_balanced = pd.concat([neg, pos]).sample(frac=1, random_state=42).reset_index(drop=True)
-
-    return df_balanced
-
-# Step 2: Preprocess text with progress bar
-def preprocess_texts(texts):
-    return [preprocess_text(t) for t in tqdm(texts, desc="🔄 Preprocessing texts")]
-
-def preprocess_text(text):
-    text = str(text).lower()
+# -----------------------------
+# Preprocessing
+# -----------------------------
+def clean_text(text):
+    text = text.lower()
     text = re.sub(r"http\S+", "", text)  # remove URLs
     text = text.translate(str.maketrans("", "", string.punctuation))  # remove punctuation
-    return text
+    return text.strip()
 
-# Step 3: Train model with live accuracy and loss curve
+# -----------------------------
+# Training function
+# -----------------------------
 def train_model(X_train, y_train, X_test, y_test, epochs=5):
-    print("⚙️ Training model with SGDClassifier...")
-    vectorizer = CountVectorizer(stop_words="english")
-    X_train_vec = vectorizer.fit_transform(tqdm(X_train, desc="📊 Vectorizing training data"))
-    X_test_vec = vectorizer.transform(X_test)
+    vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+    X_train_vec = vectorizer.fit_transform(tqdm(X_train, desc="Vectorizing train data"))
+    X_test_vec = vectorizer.transform(tqdm(X_test, desc="Vectorizing test data"))
 
-    model = SGDClassifier(loss="log_loss", max_iter=1, warm_start=True, random_state=42)
-    classes = [0, 1]
+    model = SGDClassifier(loss="log_loss", max_iter=1, warm_start=True)
 
-    losses = []
-    accuracies = []
+    acc_list, loss_list = [], []
 
-    for epoch in range(epochs):
-        print(f"\n📈 Epoch {epoch+1}/{epochs}")
-        model.partial_fit(X_train_vec, y_train, classes=classes)
+    for epoch in range(1, epochs + 1):
+        model.fit(X_train_vec, y_train)
         y_pred = model.predict(X_test_vec)
-        acc = accuracy_score(y_test, y_pred)
-        accuracies.append(acc)
-
-        # Calculate log loss
         y_proba = model.predict_proba(X_test_vec)
+
+        acc = accuracy_score(y_test, y_pred)
         loss = log_loss(y_test, y_proba)
-        losses.append(loss)
 
-        print(f"   Accuracy: {acc:.4f}, Loss: {loss:.4f}")
+        acc_list.append(acc)
+        loss_list.append(loss)
 
-    # Plot loss curve
+        print(f"📈 Epoch {epoch}/{epochs}\n   Accuracy: {acc:.4f}, Loss: {loss:.4f}")
+
+    # Save plot instead of showing
     plt.figure(figsize=(8, 5))
-    plt.plot(range(1, epochs+1), losses, marker='o', label="Loss")
-    plt.plot(range(1, epochs+1), accuracies, marker='s', label="Accuracy")
+    plt.plot(range(1, epochs + 1), acc_list, label="Accuracy", marker="o")
+    plt.plot(range(1, epochs + 1), loss_list, label="Loss", marker="o")
+    plt.xlabel("Epochs")
+    plt.ylabel("Score")
     plt.title("Training Progress")
-    plt.xlabel("Epoch")
-    plt.ylabel("Value")
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig("training_progress.png")
+    plt.close()
 
-    print("✅ Training complete")
+    # Save model and vectorizer
+    joblib.dump(model, "sentiment_model.joblib")
+    joblib.dump(vectorizer, "vectorizer.joblib")
+
     return model, vectorizer
 
-# Step 4: Predict sentiment
-def predict_sentiment(model, vectorizer, text):
-    text_clean = preprocess_text(text)
-    text_vec = vectorizer.transform([text_clean])
-    prediction = model.predict(text_vec)[0]
-    return "Positive 😀" if prediction == 1 else "Negative 😞"
-
+# -----------------------------
+# Main script
+# -----------------------------
 if __name__ == "__main__":
-    dataset_path = r"C:\Users\Kanika\sentiment_analysis\sentiment140.csv"
+    # Load dataset (replace with your path)
+    df = pd.read_csv("sentiment140.csv", encoding="latin-1", usecols=[0, 5], names=["target", "text"], skiprows=1)
+    df["text"] = df["text"].apply(clean_text)
+    df["target"] = df["target"].map({0: 0, 4: 1})  # 0=negative, 4=positive
 
-    try:
-        # Load and preprocess dataset with balanced sampling
-        df = load_data(dataset_path, sample_size=50000)
-        df["text"] = preprocess_texts(df["text"])
+    # Sample smaller dataset for faster training
+    df_sample = df.sample(n=20000, random_state=42)
+    X = df_sample["text"]
+    y = df_sample["target"]
 
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            df["text"], df["label"], test_size=0.2, random_state=42
-        )
+    # Train/test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Train model with live accuracy and loss curve
-        model, vectorizer = train_model(X_train, y_train, X_test, y_test, epochs=5)
+    # Train model
+    model, vectorizer = train_model(X_train, y_train, X_test, y_test, epochs=5)
 
-        # Final evaluation
-        print("\n📊 Final Classification Report:")
-        X_test_vec = vectorizer.transform(X_test)
-        y_pred = model.predict(X_test_vec)
-        print(classification_report(y_test, y_pred))
-
-        # Demo prediction
-        sample = "I love this product, it works great!"
-        print(f"\nSample: {sample}")
-        print("Sentiment:", predict_sentiment(model, vectorizer, sample))
-
-    except FileNotFoundError as e:
-        print("❌ Error:", e)
-        print("Make sure the file name matches exactly.")
+    # Demo prediction
+    sample = "I love this product, it works great!"
+    sample_vec = vectorizer.transform([clean_text(sample)])
+    pred = model.predict(sample_vec)[0]
+    print(f"\nSample: {sample}\nSentiment: {'Positive 😀' if pred == 1 else 'Negative 😞'}")
