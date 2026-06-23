@@ -97,3 +97,16 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## 🙋‍♀️ Author
 
 **Kanika** — [@kanika29082008-collab](https://github.com/kanika29082008-collab)
+---
+
+## 📸 Screenshots
+
+### 🏋️ Training Progress
+![Training Progress](screenshots/training_progress.png)
+
+> Model trained over 5 epochs — Accuracy reached **74.62%** with Loss dropping to **0.5274**
+
+### 🌐 Streamlit App Interface
+![App Interface](screenshots/app_interface.png)
+
+> Live demo: Enter any text and instantly get **Positive 😀** or **Negative 😞** sentiment prediction
